@@ -65,7 +65,7 @@ class Controller
                     ->where('dc.user_id', auth()->id());
             })
             ->distinct()
-            ->select('conversations.*')
+            ->select('dc.*')
             ->get();
 
         if ($conversation->count() == 0) {
@@ -77,9 +77,17 @@ class Controller
             $d->updated_at = now();
 
             $d->save();
+        } else {
+            $conversation->each(function ($item) {
+                $d = DeletedConversation::find($item->id);
 
-            return redirect()->route('messages', ['username' => auth()->user()->username]);
+                $d->created_at = now();
+
+                $d->save();
+            });
         }
+
+        return redirect()->route('messages', ['username' => auth()->user()->username]);
     }
 
     public function follow(Request $request)
