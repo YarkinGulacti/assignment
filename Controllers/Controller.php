@@ -59,16 +59,27 @@ class Controller
 
     public function delete_conversation($id)
     {
-        $d = new DeletedConversation();
+        $conversation = Conversation::where('conversations.id', $id)
+            ->join('deleted_conversations AS dc', function ($join) {
+                $join->on('dc.conversation_id', '=', 'conversations.id')
+                    ->where('dc.user_id', auth()->id());
+            })
+            ->distinct()
+            ->select('conversations.*')
+            ->get();
 
-        $d->conversation_id = $id;
-        $d->user_id = auth()->id();
-        $d->created_at = now();
-        $d->updated_at = now();
+        if ($conversation->count() == 0) {
+            $d = new DeletedConversation();
 
-        $d->save();
+            $d->conversation_id = $id;
+            $d->user_id = auth()->id();
+            $d->created_at = now();
+            $d->updated_at = now();
 
-        return redirect('/');
+            $d->save();
+
+            return redirect()->route('messages', ['username' => auth()->user()->username]);
+        }
     }
 
     public function follow(Request $request)
