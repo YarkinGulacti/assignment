@@ -251,37 +251,51 @@ class Controller
             ->first()
             ->id;
 
-            $id = User::where('username', $username)
-            ->first()
-            ->id;
-            
-        $d_conversations = Conversation::where('conversations.sender_id', $id)
-            ->orWhere('conversations.receiver_id', $id)
+        $deletion_records = Conversation::where('sender_id', $id)
+            ->orWhere('receiver_id', $id)
             ->join('deleted_conversations AS dc', function ($join) use ($id) {
                 $join->on('dc.conversation_id', '=', 'conversations.id')
                     ->where('dc.user_id', $id);
             })
-            ->join('messages AS m', function ($join) {
-                $join->on('m.conversation_id', '=', 'dc.conversation_id')
-                    ->whereColumn('dc.created_at', '<', 'm.created_at');
-            })
             ->distinct()
-            ->select('conversations.*')
-            ->get()
-            ->all();
-        $n_conversations = Conversation::where('conversations.sender_id', $id)
-            ->orWhere('conversations.receiver_id', $id)
-            ->join('deleted_conversations AS dc', function ($join) use ($id) {
-                $join->on('dc.conversation_id', '<>', 'conversations.id');
-            })
-            ->distinct()
-            ->select('conversations.*')
-            ->get()
-            ->all();
+            ->select('dc.*')
+            ->get();
+        if ($deletion_records->count() == 0) {
+            $conversations = Conversation::where('sender_id', $id)
+                ->orWhere('receiver_id', $id)
+                ->get();
+            return view('front-end.messages')
+                ->with('conversations', $conversations);
+        } else {
+            $d_conversations = Conversation::where('conversations.sender_id', $id)
+                ->orWhere('conversations.receiver_id', $id)
+                ->join('deleted_conversations AS dc', function ($join) use ($id) {
+                    $join->on('dc.conversation_id', '=', 'conversations.id')
+                        ->where('dc.user_id', $id);
+                })
+                ->join('messages AS m', function ($join) {
+                    $join->on('m.conversation_id', '=', 'dc.conversation_id')
+                        ->whereColumn('dc.created_at', '<', 'm.created_at');
+                })
+                ->distinct()
+                ->select('conversations.*')
+                ->get()
+                ->all();
 
-        $conversations = array_merge($d_conversations, $n_conversations);
+            $n_conversations = Conversation::where('conversations.sender_id', $id)
+                ->orWhere('conversations.receiver_id', $id)
+                ->join('deleted_conversations AS dc', function ($join) {
+                    $join->on('dc.conversation_id', '=', 'conversations.id')
+                        ->whereColumn('dc.conversation_id', '!=', 'conversations.id');
+                })
+                ->distinct()
+                ->select('conversations.*')
+                ->get()
+                ->all();
 
-        return view('front-end.messages')
-            ->with('conversations', $conversations);
-    }
+            $conversations = array_merge($d_conversations, $n_conversations);
+
+            return view('front-end.messages')
+                ->with('conversations', $conversations);
+        }
 }
